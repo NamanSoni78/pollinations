@@ -24,6 +24,7 @@ import {
     handleSimpleTextLocal,
     handleTextContentLocal,
 } from "@/text/handler.ts";
+import { normalizeSeedValue } from "@/util.ts";
 import { withModelFallbackResponse } from "../fallback.ts";
 import { enforceModelRateLimit } from "../utils/model-rate-limit.ts";
 import { assertStreamContentType } from "../utils/upstream-response.ts";
@@ -107,11 +108,16 @@ export const simpleAudioQuerySchema = z.object({
                 "How strictly to follow the prompt, 0-1 (`elevenlabs/eleven-text-to-sound-v2` only)",
             example: "0.3",
         }),
-    seed: z.coerce.number().int().min(-1).max(4294967295).optional().meta({
-        description:
-            "Seed passed to the model. Same seed + parameters return the same cached result while available.",
-        example: "42",
-    }),
+    seed: z
+        .preprocess(
+            normalizeSeedValue,
+            z.coerce.number().int().min(-1).max(4294967295).optional(),
+        )
+        .meta({
+            description:
+                "Seed passed to the model. Same seed + parameters return the same cached result while available.",
+            example: "42",
+        }),
     key: z.string().optional().meta({
         description: "API key (alternative to Authorization header)",
     }),

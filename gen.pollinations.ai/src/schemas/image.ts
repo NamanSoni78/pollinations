@@ -1,11 +1,9 @@
 import { DEFAULT_IMAGE_MODEL, IMAGE_SERVICES } from "@shared/registry/image.ts";
 import { SafeSchema } from "@shared/schemas/safety.ts";
 import { z } from "zod";
+import { MAX_SEED_VALUE, normalizeSeedValue } from "@/util.ts";
 
 const QUALITIES = ["low", "medium", "high", "hd"] as const;
-// Maximum seed value - use INT32_MAX for compatibility with strict providers like Vertex AI
-const MAX_SEED_VALUE = 2147483647; // INT32_MAX (2^31 - 1)
-
 const NOVA_REEL_MODELS = new Set([
     "amazon/nova-reel-v1",
     ...IMAGE_SERVICES["amazon/nova-reel-v1"].aliases,
@@ -39,13 +37,17 @@ const GenerateImageRequestQueryParamsBaseSchema = z.object({
             description:
                 "Height in pixels. For images, exact pixels; `flux-2-pro`, `flux-2-flex`, and `microsoft/mai-image-2.5-flash` require multiples of 16 (MAI also needs at least 768 px per side and at most 1,048,576 total pixels). `black-forest-labs/flux.1.1-pro` requires 256–1440 px per side in multiples of 32 and at most 1.6 megapixels. For video models, used for aspect ratio; use `resolution` to select a resolution tier.",
         }),
-    seed: z.coerce
-        .number()
-        .int()
-        .min(-1)
-        .max(MAX_SEED_VALUE)
-        .optional()
-        .default(0)
+    seed: z
+        .preprocess(
+            normalizeSeedValue,
+            z.coerce
+                .number()
+                .int()
+                .min(-1)
+                .max(MAX_SEED_VALUE)
+                .optional()
+                .default(0),
+        )
         .meta({
             description:
                 "Seed for reproducible results. Use -1 for random. Supported by: black-forest-labs/flux.1-schnell, black-forest-labs/flux.1.1-pro, tongyi-mai/z-image-turbo, bytedance/seedream-4.0, black-forest-labs/flux.2-klein-4b, bytedance/seedance-2.0, amazon/nova-reel-v1. Other models ignore this parameter.",

@@ -1,3 +1,7 @@
+import { MAX_SEED_VALUE, normalizeSeedValue } from "@shared/util.ts";
+
+export { MAX_SEED_VALUE, normalizeSeedValue };
+
 const RANDOM_ID_ALPHABET =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -63,5 +67,14 @@ export function parseBooleanLike(value: unknown): boolean | null {
 export const SENTINEL_SEED = 42;
 
 export function normalizeSeed<T extends number | undefined>(seed: T): T {
-    return (seed === -1 ? SENTINEL_SEED : seed) as T;
+    if (seed === undefined) return seed;
+    const mapped = seed === -1 ? SENTINEL_SEED : seed;
+    if (
+        typeof mapped === "number" &&
+        Number.isInteger(mapped) &&
+        mapped > MAX_SEED_VALUE
+    ) {
+        return (mapped % MAX_SEED_VALUE) as T;
+    }
+    return mapped as T;
 }

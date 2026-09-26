@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ModelHealthSchema } from "../registry/model-info.ts";
 import { MODEL_CATEGORIES } from "../registry/registry.ts";
 import { AUDIO_VOICES, DEFAULT_TEXT_MODEL } from "../registry/text.ts";
+import { normalizeSeedValue } from "../util.ts";
 import { SafeSchema } from "./safety.ts";
 
 const FunctionParametersSchema = z.record(z.string(), z.any());
@@ -337,7 +338,10 @@ export const CreateChatCompletionRequestSchema = z
         max_tokens: z.number().int().min(0).nullable().optional(),
         presence_penalty: z.number().min(-2).max(2).nullable().optional(),
         response_format: ResponseFormatUnionSchema.optional(),
-        seed: z.number().int().min(-1).max(2147483647).nullable().optional(),
+        seed: z.preprocess(
+            normalizeSeedValue,
+            z.number().int().min(-1).max(2147483647).nullable().optional(),
+        ),
         stop: z
             .union([z.string().nullable(), z.array(z.string()).min(1).max(4)])
             .optional(),

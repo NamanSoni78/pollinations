@@ -1,7 +1,7 @@
 import { DEFAULT_TEXT_MODEL } from "@shared/registry/text.ts";
 import { SafeSchema } from "@shared/schemas/safety.ts";
 import { z } from "zod";
-import { parseBooleanLike } from "@/util.ts";
+import { normalizeSeedValue, parseBooleanLike } from "@/util.ts";
 
 // z.coerce.boolean() coerces the string "false" to true; parse boolean-ish
 // tokens instead and let unrecognized values fail validation.
@@ -27,10 +27,15 @@ export const GenerateTextRequestQueryParamsSchema = z.object({
         description:
             "Text model to use. See /v1/models or /text/models for the full list of available models.",
     }),
-    seed: z.coerce.number().int().min(-1).optional().meta({
-        description:
-            "Optional seed for reproducible results on models that support it. Omitted by default. -1 maps to the stable compatibility seed.",
-    }),
+    seed: z
+        .preprocess(
+            normalizeSeedValue,
+            z.coerce.number().int().min(-1).optional(),
+        )
+        .meta({
+            description:
+                "Optional seed for reproducible results on models that support it. Omitted by default. -1 maps to the stable compatibility seed.",
+        }),
     system: z.string().optional().meta({
         description:
             "System prompt to set the model's behavior and context. Acts as initial instructions before the user prompt.",

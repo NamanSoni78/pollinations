@@ -4,7 +4,6 @@ import {
 } from "@shared/registry/model3d.ts";
 import { SafeSchema } from "@shared/schemas/safety.ts";
 import { z } from "zod";
-import { normalizeSeedValue } from "@/util.ts";
 
 const VALID_3D_MODELS = [
     ...Object.keys(MODEL3D_SERVICES),
@@ -53,12 +52,10 @@ export const Generate3dRequestQueryParamsSchema = z.object({
             description:
                 "Reference image URL(s) for image-to-3D generation. Separate multiple URLs with `|` or `,`. Required for image-only models (e.g. `trellis`, `triposr`, `sf3d`).",
         }),
-    seed: z
-        .preprocess(normalizeSeedValue, z.coerce.number().int().optional())
-        .meta({
-            description:
-                "Seed for varied generations. Passed through to models that support it (`hyper3d/rodin-2.5`); otherwise only affects the media-cache key, so a new seed forces a fresh generation for the same prompt/image.",
-        }),
+    seed: z.coerce.number().int().optional().meta({
+        description:
+            "Seed for varied generations. Passed through to models that support it (`hyper3d/rodin-2.5`); otherwise only affects the media-cache key, so a new seed forces a fresh generation for the same prompt/image.",
+    }),
     safe: SafeSchema,
 });
 
@@ -103,11 +100,9 @@ export const Generate3dRequestBodySchema = z
                 description:
                     "Output voxel-grid resolution for `microsoft/trellis-2`: `low` (512³), `medium` (1024³), or `high` (1536³). Higher resolutions add detail, take longer, and cost more.",
             }),
-        seed: z
-            .preprocess(normalizeSeedValue, z.number().int().optional())
-            .meta({
-                description:
-                    "Seed for varied generations. Passed to models that support it.",
-            }),
+        seed: z.number().int().optional().meta({
+            description:
+                "Seed for varied generations. Passed to models that support it.",
+        }),
     })
     .strict();

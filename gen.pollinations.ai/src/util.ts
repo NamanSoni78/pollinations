@@ -1,7 +1,3 @@
-import { MAX_SEED_VALUE, normalizeSeedValue } from "@shared/util.ts";
-
-export { MAX_SEED_VALUE, normalizeSeedValue };
-
 const RANDOM_ID_ALPHABET =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -54,6 +50,25 @@ export function parseBooleanLike(value: unknown): boolean | null {
     if (TRUE_TOKENS.includes(normalized)) return true;
     if (FALSE_TOKENS.includes(normalized)) return false;
     return null;
+}
+
+// Maximum seed value - use INT32_MAX for compatibility with strict providers like Vertex AI
+export const MAX_SEED_VALUE = 2147483647; // INT32_MAX (2^31 - 1)
+
+/**
+ * Normalizes a raw seed input value before schema limit validation.
+ * Positive integer numbers or numeric integer strings greater than MAX_SEED_VALUE (2147483647)
+ * are mapped deterministically into the supported INT32 seed range using modulo MAX_SEED_VALUE.
+ */
+export function normalizeSeedValue(val: unknown): unknown {
+    if (val === undefined || val === null || val === "") {
+        return val;
+    }
+    const num = typeof val === "number" ? val : Number(val);
+    if (Number.isInteger(num) && num > MAX_SEED_VALUE) {
+        return num % MAX_SEED_VALUE;
+    }
+    return val;
 }
 
 /**

@@ -7,19 +7,20 @@ import {
 } from "../../src/util.js";
 
 describe("Image Seed Normalization & Validation", () => {
-    it("accepts a 13-digit timestamp (Date.now()) and normalizes it deterministically", () => {
+    it("accepts a 13-digit timestamp (Date.now()) as string and number, producing identical normalized seeds", () => {
         const timestamp = 1790366032000;
         const expectedNormalized = timestamp % MAX_SEED_VALUE;
 
         const parsedNumber = GenerateImageRequestQueryParamsSchema.parse({
             seed: timestamp,
         });
-        expect(parsedNumber.seed).toBe(expectedNormalized);
-
         const parsedString = GenerateImageRequestQueryParamsSchema.parse({
             seed: String(timestamp),
         });
+
+        expect(parsedNumber.seed).toBe(expectedNormalized);
         expect(parsedString.seed).toBe(expectedNormalized);
+        expect(parsedString.seed).toBe(parsedNumber.seed);
     });
 
     it("preserves 2147483647 as 2147483647", () => {
@@ -30,12 +31,16 @@ describe("Image Seed Normalization & Validation", () => {
     });
 
     it("preserves 42 as 42", () => {
-        const parsed = GenerateImageRequestQueryParamsSchema.parse({ seed: 42 });
+        const parsed = GenerateImageRequestQueryParamsSchema.parse({
+            seed: 42,
+        });
         expect(parsed.seed).toBe(42);
     });
 
     it("preserves -1 as -1 in schema parsing", () => {
-        const parsed = GenerateImageRequestQueryParamsSchema.parse({ seed: -1 });
+        const parsed = GenerateImageRequestQueryParamsSchema.parse({
+            seed: -1,
+        });
         expect(parsed.seed).toBe(-1);
     });
 
@@ -47,7 +52,7 @@ describe("Image Seed Normalization & Validation", () => {
         expect(result1).toBe(timestamp % MAX_SEED_VALUE);
     });
 
-    it("retains existing validation behavior for invalid inputs like -5 and abc", () => {
+    it("retains existing validation behavior for invalid inputs (-5, abc, float, unsafe int)", () => {
         expect(() =>
             GenerateImageRequestQueryParamsSchema.parse({ seed: -5 }),
         ).toThrow();
@@ -55,14 +60,21 @@ describe("Image Seed Normalization & Validation", () => {
         expect(() =>
             GenerateImageRequestQueryParamsSchema.parse({ seed: "abc" }),
         ).toThrow();
+
+        expect(() =>
+            GenerateImageRequestQueryParamsSchema.parse({ seed: 12.34 }),
+        ).toThrow();
+
+        expect(() =>
+            GenerateImageRequestQueryParamsSchema.parse({
+                seed: "9007199254740993",
+            }),
+        ).toThrow();
     });
 
-    it("normalizeSeed helper converts -1 to sentinel 42 and large seeds via modulo", () => {
+    it("normalizeSeed helper converts -1 to sentinel 42 without altering positive seeds", () => {
         expect(normalizeSeed(-1)).toBe(42);
         expect(normalizeSeed(42)).toBe(42);
-        expect(normalizeSeed(1790366032000)).toBe(
-            1790366032000 % MAX_SEED_VALUE,
-        );
         expect(normalizeSeed(undefined)).toBeUndefined();
     });
 });

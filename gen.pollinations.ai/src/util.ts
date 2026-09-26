@@ -57,16 +57,24 @@ export const MAX_SEED_VALUE = 2147483647; // INT32_MAX (2^31 - 1)
 
 /**
  * Normalizes a raw seed input value before schema limit validation.
- * Positive integer numbers or numeric integer strings greater than MAX_SEED_VALUE (2147483647)
+ * Safe positive integer numbers or digit-only numeric strings greater than MAX_SEED_VALUE (2147483647)
  * are mapped deterministically into the supported INT32 seed range using modulo MAX_SEED_VALUE.
  */
 export function normalizeSeedValue(val: unknown): unknown {
-    if (val === undefined || val === null || val === "") {
+    if (typeof val === "number") {
+        if (Number.isSafeInteger(val) && val > MAX_SEED_VALUE) {
+            return val % MAX_SEED_VALUE;
+        }
         return val;
     }
-    const num = typeof val === "number" ? val : Number(val);
-    if (Number.isInteger(num) && num > MAX_SEED_VALUE) {
-        return num % MAX_SEED_VALUE;
+    if (typeof val === "string") {
+        const trimmed = val.trim();
+        if (/^\d+$/.test(trimmed)) {
+            const num = Number(trimmed);
+            if (Number.isSafeInteger(num) && num > MAX_SEED_VALUE) {
+                return num % MAX_SEED_VALUE;
+            }
+        }
     }
     return val;
 }
@@ -82,14 +90,5 @@ export function normalizeSeedValue(val: unknown): unknown {
 export const SENTINEL_SEED = 42;
 
 export function normalizeSeed<T extends number | undefined>(seed: T): T {
-    if (seed === undefined) return seed;
-    const mapped = seed === -1 ? SENTINEL_SEED : seed;
-    if (
-        typeof mapped === "number" &&
-        Number.isInteger(mapped) &&
-        mapped > MAX_SEED_VALUE
-    ) {
-        return (mapped % MAX_SEED_VALUE) as T;
-    }
-    return mapped as T;
+    return (seed === -1 ? SENTINEL_SEED : seed) as T;
 }

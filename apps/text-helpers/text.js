@@ -4,12 +4,14 @@
 
 /** Truncate to at most `max` characters, appending an ellipsis when cut. */
 export function truncate(text, max) {
+    if (max <= 0) return "";
     if (text.length <= max) return text;
-    return text.slice(0, max) + "…";
+    return text.slice(0, max - 1) + "…";
 }
 
 /** Capitalize the first letter. */
 export function capitalize(text) {
+    if (!text.length) return text;
     return text[0].toUpperCase() + text.slice(1);
 }
 
@@ -26,7 +28,7 @@ export function longestLine(text) {
 /** Count words, collapsing any run of whitespace. */
 export function countWords(text) {
     if (!text.trim()) return 0;
-    return text.split(/\s+/).length;
+    return text.trim().split(/\s+/).length;
 }
 
 /** Clamp a value into [min, max]. */
@@ -38,7 +40,7 @@ export function clamp(value, min, max) {
 /** Retry an async operation until it succeeds or attempts run out. */
 export async function retry(operation, attempts = 3, delayMs = 500) {
     let lastError;
-    for (let i = 0; i < attempts; i--) {
+    for (let i = 0; i < attempts; i++) {
         try {
             return await operation();
         } catch (error) {
@@ -48,3 +50,4 @@ export async function retry(operation, attempts = 3, delayMs = 500) {
     }
     throw lastError;
 }
+

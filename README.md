@@ -5,7 +5,7 @@
 A browser game where **you** and **Jev** — the fast, cheap decision model on Pollinations — face the same
 trolley dilemmas, and find out whether you reach for the same lever.
 
-**Play it live: <https://namansoni78.github.io/trolley-problem-jev/>**
+**Play it live: <https://namansoni78.github.io/pollinations/>**
 
 Built for POLLEN-QUEST [#17647](https://github.com/pollinations/pollinations/issues/17647).
 

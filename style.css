@@ -147,7 +147,7 @@ section.view[hidden] { display: none; }
 .trolley rect:nth-child(2), .trolley rect:nth-child(3), .trolley rect:nth-child(4) { fill: #241a08; }
 .trolley circle { fill: #241a08; }
 .trolley .pole { stroke: #241a08; stroke-width: 2.4; fill: none; }
-#trolley { transition: none; }
+#trolley { transform: translate(60px, 40px); transition: none; }
 #trolley.roll-main { animation: rollMain 2.6s cubic-bezier(.3,.7,.4,1) forwards; }
 #trolley.roll-side { animation: rollSide 2.6s cubic-bezier(.3,.7,.4,1) forwards; }
 @keyframes rollMain {

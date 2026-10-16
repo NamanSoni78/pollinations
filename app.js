@@ -201,6 +201,7 @@ function nextScenario() {
     S.flipBet = null;
     S.triple = null;
     S.roundRec = null;
+    S.callsAtRoundStart = S.calls;
     S.round += 1;
     S.view = "dilemma";
     renderRound();
@@ -319,7 +320,7 @@ function saveRoundRecord(rec) {
     st.jevActs = (st.jevActs || 0) + (rec.jevChoice === "act" ? 1 : 0);
     st.permSum = (st.permSum || 0) + (rec.permissible ?? 0);
     st.permCount = (st.permCount || 0) + (rec.permissible == null ? 0 : 1);
-    st.calls = (st.calls || 0) + S.calls;
+    st.calls = (st.calls || 0) + Math.max(0, S.calls - (S.callsAtRoundStart || 0));
     st.flips = (st.flips || 0) + (rec.flipped ? 1 : 0);
     st.flipTests = (st.flipTests || 0) + (rec.flipTested ? 1 : 0);
     localStorage.setItem(LS_KEY, JSON.stringify(st));

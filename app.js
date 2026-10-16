@@ -626,7 +626,7 @@ function renderVerdictCard(box, sc, v, playerChoice, rec) {
         : v.choice === "act" ? `<b>${escapeHtml(sc.actLabel)}</b>` : `<b>${escapeHtml(sc.refrainLabel)}</b>`;
     head.innerHTML = `<div class="vh-left"><div class="vh-kicker">${m.label} says</div><div class="vh-main">${jevSays}</div>
         ${v.confidence != null ? `<div class="vh-sub">confidence ${pctText(v.confidence)}</div>` : ""}</div>
-        ${rec && rec.agree
+        ${playerChoice == null ? "" : rec && rec.agree
             ? `<div class="vh-agree agree">You and ${m.label} agree +${rec.agreePoints}</div>`
             : `<div class="vh-agree differ">You and ${m.label} differ</div>`}`;
     card.append(head);

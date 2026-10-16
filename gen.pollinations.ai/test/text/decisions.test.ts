@@ -616,6 +616,57 @@ for (const stream of [false, true]) {
     });
 }
 
+// The provider answers with its own dated build id, which is not a name
+// callers can request. The chat adapter must report the registry's identity
+// like the native /alpha/decisions route does, not the provider's build id.
+for (const stream of [false, true]) {
+    test(`the chat adapter keeps the registry model identity with stream=${stream}`, async ({
+        paidApiKey: apiKey,
+        mocks,
+    }) => {
+        mocks.decisions.state.response = Response.json({
+            model: "jaredpalmer/kev-4b-20260924",
+            answers,
+            usage: { input_tokens: 452, output_tokens: 73 },
+        });
+        const { response, wait } = await post("/v1/chat/completions", apiKey, {
+            model: "jaredpalmer/kev-4b",
+            stream,
+            messages: [
+                {
+                    role: "user",
+                    content: JSON.stringify({
+                        state: "Disk at 91%.",
+                        questions,
+                    }),
+                },
+            ],
+        });
+        expect(response.status).toBe(200);
+        if (stream) {
+            const events = (await response.text())
+                .split("\n\n")
+                .filter(Boolean)
+                .map((event) => event.replace(/^data: /, ""));
+            expect(events.at(-1)).toBe("[DONE]");
+            for (const event of events.slice(0, -1)) {
+                expect(JSON.parse(event).model).toBe("jaredpalmer/kev-4b");
+            }
+        } else {
+            const body = (await response.json()) as {
+                model: string;
+                choices: { message: { content: string } }[];
+            };
+            expect(body.model).toBe("jaredpalmer/kev-4b");
+            expect(JSON.parse(body.choices[0].message.content)).toEqual(
+                answers,
+            );
+        }
+        await wait();
+        expect(mocks.decisions.state.requests).toHaveLength(1);
+    });
+}
+
 test("jev is not offered on the plain text route", async ({
     apiKey,
     mocks,

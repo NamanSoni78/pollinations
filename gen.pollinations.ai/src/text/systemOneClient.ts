@@ -270,7 +270,11 @@ export async function callSystemOne(
         id: `systemone-${crypto.randomUUID()}`,
         object: "chat.completion",
         created: Math.floor(Date.now() / 1000),
-        model: result.model,
+        // The registry owns public model identity: the provider answers with
+        // its own dated build id, which is not a name callers can request.
+        // requestedModel carries the canonical registry id of the candidate
+        // that ran (the requested listing, or its fallback target).
+        model: options.requestedModel ?? result.model,
         choices: [
             {
                 index: 0,

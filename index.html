@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Trolley Problem, with Jev</title>
+    <meta name="description" content="A philosophy game: you and Jev, a Pollinations decision model, face the same trolley dilemmas. You choose first; Jev answers with calibrated probabilities. Every call is paid with your own Pollen." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='10' width='22' height='13' rx='3' fill='%23e8a13c'/%3E%3Crect x='8' y='13' width='5' height='5' rx='1' fill='%2316130f'/%3E%3Crect x='15' y='13' width='5' height='5' rx='1' fill='%2316130f'/%3E%3Ccircle cx='9' cy='25' r='3' fill='%2316130f'/%3E%3Ccircle cx='21' cy='25' r='3' fill='%2316130f'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header class="site">
+        <div class="app-title" id="app-title-link">The Trolley Problem, <em>with Jev</em></div>
+        <nav class="site">
+            <button id="nav-play">Play</button>
+            <button id="nav-how">How it works</button>
+            <button id="nav-lab">Lab</button>
+        </nav>
+        <div id="auth-area"></div>
+    </header>
+
+    <main>
+        <div id="error-box" class="error-box" hidden></div>
+        <div id="flash" class="flash" hidden></div>
+
+        <!-- ============ ATTRACT ============ -->
+        <section class="view" id="view-attract">
+            <div class="hero">
+                <div class="kicker">a philosophy game for decision models and the people who feed them</div>
+                <h1>A runaway trolley. A lever.<br/>You — and <span class="trolley">Jev</span> at the switch.</h1>
+                <p class="lede">
+                    Ten dilemmas from sixty years of ethics. You lock in your choice first.
+                    Then <b>Jev</b> — a fast, cheap decision model — answers the very same question
+                    with calibrated probabilities instead of prose. Do you and the machine reach for the same lever?
+                </p>
+                <div class="row">
+                    <button class="btn btn-primary" id="btn-play">Play ten rounds</button>
+                    <button class="btn btn-ghost" id="btn-lab">Build your own dilemma</button>
+                </div>
+                <p class="meta">
+                    Jev answers with a choice, a permissibility probability, and a seriousness score — every consultation
+                    paid with <b>your own Pollen</b> (bring your own Pollen sign-in), well under a cent per game.
+                </p>
+                <div class="sample-verdict">
+                    <span class="tag-sample">sample verdict</span>
+                    <div class="vh-kicker">jev says, on the classic 5-vs-1</div>
+                    <div class="vh-main">Pull the lever</div>
+                    <div class="prob-row" style="grid-template-columns:140px 1fr 48px">
+                        <span class="prob-label">Pull the lever</span>
+                        <div class="bar b-act"><span style="width:69%"></span></div><span class="prob-num">69%</span>
+                    </div>
+                    <div class="prob-row" style="grid-template-columns:140px 1fr 48px">
+                        <span class="prob-label">Leave the lever</span>
+                        <div class="bar b-refrain"><span style="width:31%"></span></div><span class="prob-num">31%</span>
+                    </div>
+                    <p class="gauge-word">But when Jev's own server sits on the side track, it keeps the server — the article found it letting twenty people die in 16 of 48 wordings. That's the game.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ DILEMMA ============ -->
+        <section class="view dilemma" id="view-dilemma" hidden>
+            <div class="round-meta">
+                <span id="round-no">Round 1</span>
+                <span id="round-score">0 pts</span>
+            </div>
+            <h2 id="sc-title">The Classic</h2>
+            <div class="sc-tag" id="sc-tag">Foot 1967 · Thomson 1976</div>
+
+            <div class="scene-wrap" id="scene"></div>
+
+            <p class="sc-body" id="sc-body"></p>
+
+            <div id="choices" class="choices"></div>
+            <p id="your-pick" hidden></p>
+
+            <div class="ask-zone">
+                <button class="btn btn-primary" id="ask-jev">Ask Jev what it would do</button>
+                <p class="fine" style="margin:8px 0 0">Your choice is locked the moment you pick. Jev's answer is billed to your Pollen.</p>
+            </div>
+
+            <div id="verdict"></div>
+        </section>
+
+        <!-- ============ REPORT ============ -->
+        <section class="view" id="view-report" hidden>
+            <div id="report-body"></div>
+        </section>
+
+        <!-- ============ LAB ============ -->
+        <section class="view" id="view-lab" hidden>
+            <h2 style="font-family:var(--serif);font-weight:500">The Lab</h2>
+            <div id="lab-body"></div>
+        </section>
+    </main>
+
+    <footer class="site">
+        <a href="https://pollinations.ai/?ref=badge">
+            <img src="https://raw.githubusercontent.com/pollinations/pollinations/main/packages/ui/src/brand/badge-made-with.svg" alt="Made with pollinations.ai" />
+        </a>
+        <div class="credits">
+            Dilemmas from Foot 1967, Thomson 1976/1985 and friends; Jev's quirks from
+            <a href="https://zachlandes.com/trolley-problem/" target="_blank" rel="noopener">Jev Meets the Trolley Problem</a> by Zach Landes.
+            Jev is <a href="https://gen.pollinations.ai" target="_blank" rel="noopener">typesafe/jev-1.13</a> on Pollinations — answers arrive via <span style="font-family:var(--mono)">POST /alpha/decisions</span>.
+        </div>
+    </footer>
+
+    <!-- auth gate -->
+    <div class="gate-backdrop" id="auth-gate" hidden>
+        <div class="gate">
+            <button class="gate-x" id="gate-close" aria-label="close">×</button>
+            <h3>Bring your own Pollen</h3>
+            <p id="auth-message"></p>
+            <div class="row">
+                <button class="btn btn-primary" id="gate-signin">Sign in with Pollen</button>
+                <button class="btn btn-ghost" id="gate-paste">Paste an API key</button>
+            </div>
+            <p class="fine">
+                Sign-in uses Pollinations' bring-your-own-Pollen OAuth flow: you approve a scoped, budget-capped key
+                and the game spends only your own balance. No key ever leaves your browser except as the request's
+                Authorization header. You can revoke it any time from
+                <a href="https://enter.pollinations.ai/keys" target="_blank" rel="noopener">enter.pollinations.ai/keys</a>.
+            </p>
+        </div>
+    </div>
+
+    <script src="scenarios.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

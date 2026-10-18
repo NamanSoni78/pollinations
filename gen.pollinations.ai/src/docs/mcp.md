@@ -13,6 +13,7 @@ then choose a server:
 | --- | --- | --- | --- |
 | Pollinations | `https://gen.pollinations.ai/mcp/pollinations` | Discover and use models, generate text and media, create embeddings and 3D models, and inspect model status and account balance | [README](https://github.com/pollinations/pollinations/blob/main/packages/mcp/README.md) |
 | Ask Jev | `https://gen.pollinations.ai/mcp/ask-jev` | Evaluate state with typed choice, score, and probability questions | [Source](https://github.com/pollinations/pollinations/tree/main/apps/ask-jev-mcp) |
+| Eyes | `https://gen.pollinations.ai/mcp/eyes` | Look at images: answer questions, describe, read visible text, and compare images | [Source](https://github.com/pollinations/pollinations/tree/main/apps/eyes-mcp) |
 | FFmpeg | `https://gen.pollinations.ai/mcp/ffmpeg` | Trim, convert, resize, compress, and remix audio and video | [Source](https://github.com/pollinations/pollinations/tree/main/apps/ffmpeg-mcp) |
 | Exa Search | `https://gen.pollinations.ai/mcp/exa` | Search the live web and fetch clean page content | [Source](https://github.com/pollinations/pollinations/tree/main/apps/exa-mcp) |
 | Connectors | `https://gen.pollinations.ai/mcp/composio` | Read Gmail, read and commit to GitHub, update Sheets, and post to Slack through Composio | [Source](https://github.com/pollinations/pollinations/tree/main/apps/composio-mcp) |
@@ -142,6 +143,16 @@ with the link can access it, and it expires after 30 days.
 probabilities. Include relevant facts in `state`; confidence can remain high
 when facts are missing. Calls use Jev's listed model rate with no additional
 MCP fee.
+
+### Eyes MCP
+
+`look` sends images (public URLs or `data:image/...` URIs) and an optional
+question to a vision-capable model and returns the answer; without a question
+it returns a detailed description. Pass several images to compare them.
+`read_image_text` returns the text visible in an image verbatim, in natural
+reading order. Select a model with `model` and tune `detail` (`low` or `high`)
+for speed or fine print. Calls use the selected model's listed rate with no
+additional MCP fee.
 
 ### FFmpeg MCP
 

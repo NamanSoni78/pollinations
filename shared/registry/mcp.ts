@@ -47,6 +47,7 @@ export type McpBindingName =
     | "EXA_MCP"
     | "COMPOSIO_MCP"
     | "COMPUTER_MCP"
+    | "EYES_MCP"
     | "MACHINES_MCP";
 
 export type McpServerDefinition = McpServerDefinitionBase &
@@ -124,6 +125,19 @@ export const MCP_SERVERS = [
         pricing: {
             description:
                 "Decision tools use Jev's listed model rate. No additional MCP fee.",
+            rates: [],
+        },
+    },
+    {
+        id: "eyes",
+        name: "Eyes",
+        description:
+            "Look at images: answer questions, describe, read visible text, and compare images.",
+        binding: "EYES_MCP",
+        billing: "downstream",
+        pricing: {
+            description:
+                "Vision tools use the selected model's listed rate. No additional MCP fee.",
             rates: [],
         },
     },

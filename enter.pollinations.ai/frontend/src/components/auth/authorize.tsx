@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { accountClient, apiClient } from "../../api.ts";
 import { authClient, type User } from "../../auth.ts";
 import { createKeyWithPermissions } from "../../lib/create-api-key.ts";
+import { safeHttpUrl } from "../../lib/safe-url.ts";
 import { AppEarningsRow } from "../keys/app-earnings-row.tsx";
 import {
     KeyPermissionsInputs,
@@ -54,11 +55,9 @@ async function readAttribution(response: Response): Promise<Attribution> {
 }
 
 function safeParseUrl(url: string): URL | null {
-    try {
-        return new URL(url);
-    } catch {
-        return null;
-    }
+    // Reject executable schemes (javascript:, data:) before the parsed URL
+    // reaches the window.location.href sinks below.
+    return safeHttpUrl(url);
 }
 
 export function Authorize() {

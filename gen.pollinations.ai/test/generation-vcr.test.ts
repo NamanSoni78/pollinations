@@ -736,6 +736,8 @@ async function fakePortkeyResponse(request: Request) {
                 provider_usage_option: { cached: 1 },
                 search_context_size: "low",
                 cost: { total_cost: 0.000006 },
+                payg_credits_charged: 0.0001,
+                payg_ledger_entry: { balance_after: 38.9 },
             },
         });
     }
@@ -2991,6 +2993,8 @@ test("chat responses preserve choices and extensions but hide private usage", as
     expect(body.usage.provider_usage_option).toEqual({ cached: 1 });
     expect(body.usage).not.toHaveProperty("cost");
     expect(body.usage).not.toHaveProperty("search_context_size");
+    expect(body.usage).not.toHaveProperty("payg_credits_charged");
+    expect(body.usage).not.toHaveProperty("payg_ledger_entry");
     await wait();
 });
 
@@ -3282,7 +3286,7 @@ test("OpenAI image generation returns token usage", async ({
     });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-cache")).toBe("HIT");
+    expect(response.headers.get("x-cache")).toBe("MISS");
     expect(response.headers.get("x-cache-type")).toBeNull();
     await expect(response.json()).resolves.toMatchObject({
         data: [{ b64_json: expect.any(String) }],

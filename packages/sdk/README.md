@@ -389,6 +389,26 @@ await revokeKey(created.id);
 
 Without `accountPermissions`, scoped keys can generate media but cannot read account state (balance, usage).
 
+### Hosting static sites
+
+Publish files at `https://<name>.pollinations.app`. Send every file inline, up to 5 MB per request; `index.html` is required. The key needs the `machines` account permission.
+
+```javascript
+import { deploySite, listSites, deleteSite } from '@pollinations/sdk';
+
+const site = await deploySite('my-app', [
+  { file: 'index.html', data: '<h1>Hello</h1><script src="app.js"></script>' },
+  { file: 'app.js', data: 'console.log("hi")' },
+  { file: 'logo.png', data: pngBase64, encoding: 'base64' },
+]);
+console.log(site.url); // https://my-app.pollinations.app
+
+const { data } = await listSites();
+await deleteSite('my-app');
+```
+
+For bigger sites, use `polli sites deploy ./dist --name my-app`.
+
 ## Image Generation
 
 ```javascript
@@ -573,6 +593,42 @@ include `model`, `referenceImage` (one URL or an array), `resolution`, `seed`,
 without an API key. The server's MIME type is preserved for GLB and PLY files.
 3D shares video's 20-minute timeout; override it with `videoTimeout` on the client.
 Check each model's `paid_only` flag before using it with Quest Pollen.
+
+## Async media jobs
+
+Leave a slow generation running after disconnecting, then check and download it
+with the same account. Supported by `imageAsync`, `videoAsync`, `audioAsync`,
+and `model3dAsync` on the client.
+
+```javascript
+import { Pollinations } from '@pollinations/sdk';
+import { writeFile } from 'node:fs/promises';
+
+const client = new Pollinations(); // reads POLLINATIONS_API_KEY from the environment
+const submitted = await client.videoAsync('a paper boat on a river', {
+  model: 'google/veo-3.1-fast',
+});
+let file;
+if ('result' in submitted) {
+  file = submitted.result; // already cached; no job id needed
+} else {
+  let job;
+  do {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    job = await client.job(submitted.id);
+  } while (job.status === 'pending');
+  if (job.status === 'failed') throw new Error(job.error?.message || 'Generation failed');
+  file = await client.jobResult(submitted.id);
+}
+await writeFile('boat.mp4', new Uint8Array(file.buffer));
+```
+
+Submission returns a job id and 202 response immediately unless a cached file
+is returned directly. Only accounts that submitted the job may poll or download
+it; polling does not charge again. Status records last 24 hours after completion.
+Pass an `AbortSignal` to cancel the HTTP request; this does not cancel a job
+already running in the durable coordinator. The SDK authenticates with a
+header and does not put the credential in a media URL.
 
 ## Audio (Text-to-Speech & Music)
 

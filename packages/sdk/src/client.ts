@@ -36,6 +36,9 @@ import type {
     ImageResponse,
     KeyInfo,
     KeyUsageOptions,
+    MediaJobResult,
+    MediaJobStatus,
+    MediaJobSubmission,
     Message,
     Model3dGenerateOptions,
     Model3dResponse,
@@ -45,6 +48,9 @@ import type {
     ModelStatusResponse,
     PollinationsConfig,
     RequestOptions,
+    Site,
+    SiteFile,
+    SitesResponse,
     SpeechWordTiming,
     TextGenerateOptions,
     TranscribeOptions,
@@ -514,7 +520,11 @@ export class Pollinations {
         };
 
         if (options.image) {
-            body.image = options.image;
+            // The JSON edits endpoint follows the OpenAI shape: a single URL
+            // string or an array of { image_url } objects.
+            body.image = Array.isArray(options.image)
+                ? options.image.map((image_url) => ({ image_url }))
+                : options.image;
         }
 
         const json = await fetchWithTimeout(
@@ -792,6 +802,180 @@ export class Pollinations {
                         response.headers.get("content-type") ||
                         "model/gltf-binary",
                     url,
+                };
+            },
+        );
+    }
+
+    // ============================================================================
+    // Asynchronous Media Jobs
+    // ============================================================================
+
+    /** Submit a media request without waiting for the provider to finish. */
+    private async submitMedia(
+        url: string,
+        signal?: AbortSignal,
+    ): Promise<MediaJobSubmission> {
+        return fetchWithTimeout(
+            url,
+            { headers: { ...this.getHeaders(), Prefer: "respond-async" } },
+            this.textTimeout,
+            signal,
+            async (response) => {
+                if (response.status === 202) {
+                    const job = (await response.json()) as Record<
+                        string,
+                        unknown
+                    >;
+                    if (
+                        typeof job.id !== "string" ||
+                        !/^[0-9a-f]{64}$/.test(job.id) ||
+                        (job.status !== "pending" &&
+                            job.status !== "succeeded") ||
+                        typeof job.status_url !== "string"
+                    ) {
+                        throw new PollinationsError(
+                            "Invalid media job response",
+                            "INVALID_RESPONSE",
+                            502,
+                        );
+                    }
+                    return job as MediaJobSubmission;
+                }
+                if (!response.ok) await this.handleErrorResponse(response);
+                // The server may ignore Prefer when the media is already cached.
+                return {
+                    status: "succeeded",
+                    result: {
+                        buffer: await response.arrayBuffer(),
+                        contentType:
+                            response.headers.get("content-type") ||
+                            "application/octet-stream",
+                    },
+                };
+            },
+        );
+    }
+
+    async imageAsync(
+        prompt: string,
+        options: ImageGenerateOptions = {},
+    ): Promise<MediaJobSubmission> {
+        if (!prompt)
+            throw new PollinationsError(
+                "Prompt is required",
+                "INVALID_INPUT",
+                400,
+            );
+        return this.submitMedia(
+            stripKeyFromUrl(this.buildImageUrl(prompt, options)),
+            options.signal,
+        );
+    }
+
+    async videoAsync(
+        prompt: string,
+        options: VideoGenerateOptions = {},
+    ): Promise<MediaJobSubmission> {
+        if (!prompt)
+            throw new PollinationsError(
+                "Prompt is required",
+                "INVALID_INPUT",
+                400,
+            );
+        return this.submitMedia(
+            stripKeyFromUrl(this.buildVideoUrl(prompt, options)),
+            options.signal,
+        );
+    }
+
+    async audioAsync(
+        text: string,
+        options: AudioGenerateOptions = {},
+    ): Promise<MediaJobSubmission> {
+        if (!text)
+            throw new PollinationsError(
+                "Text is required",
+                "INVALID_INPUT",
+                400,
+            );
+        const query = this.buildQueryParams(
+            {
+                voice: options.voice,
+                model: options.model,
+                duration: options.duration,
+                seed: options.seed,
+            },
+            false,
+        );
+        return this.submitMedia(
+            `${this.baseUrl}/audio/${encodeURIComponent(text)}${query ? `?${query}` : ""}`,
+            options.signal,
+        );
+    }
+
+    async model3dAsync(
+        prompt: string,
+        options: Model3dGenerateOptions = {},
+    ): Promise<MediaJobSubmission> {
+        if (!prompt)
+            throw new PollinationsError(
+                "Prompt is required",
+                "INVALID_INPUT",
+                400,
+            );
+        const query = this.buildQueryParams(
+            {
+                model: options.model,
+                image: options.referenceImage,
+                resolution: options.resolution,
+                seed: options.seed,
+                safe: options.safe,
+            },
+            false,
+        );
+        return this.submitMedia(
+            `${this.baseUrl}/3d/${encodeURIComponent(prompt)}${query ? `?${query}` : ""}`,
+            options.signal,
+        );
+    }
+
+    private jobPath(id: string): string {
+        if (!/^[0-9a-f]{64}$/.test(id)) {
+            throw new PollinationsError(
+                "Invalid media job id",
+                "INVALID_INPUT",
+                400,
+            );
+        }
+        return `${this.baseUrl}/v1/jobs/${id}`;
+    }
+
+    /** Poll a submitted job until its status is succeeded or failed. */
+    async job(
+        id: string,
+        options: RequestOptions = {},
+    ): Promise<MediaJobStatus> {
+        return this.getJson<MediaJobStatus>(this.jobPath(id), options.signal);
+    }
+
+    /** Download the completed result; rejects with 409 while still pending. */
+    async jobResult(
+        id: string,
+        options: RequestOptions = {},
+    ): Promise<MediaJobResult> {
+        return fetchWithTimeout(
+            `${this.jobPath(id)}/result`,
+            { headers: this.getHeaders() },
+            this.videoTimeout,
+            options.signal,
+            async (response) => {
+                if (!response.ok) await this.handleErrorResponse(response);
+                return {
+                    buffer: await response.arrayBuffer(),
+                    contentType:
+                        response.headers.get("content-type") ||
+                        "application/octet-stream",
                 };
             },
         );
@@ -1974,6 +2158,81 @@ export class Pollinations {
             async (response) => {
                 if (!response.ok) await this.handleErrorResponse(response);
                 return response.json() as Promise<CreatedKey>;
+            },
+        );
+    }
+
+    /**
+     * List your static sites and the account's site limits.
+     * Needs a key with the `machines` account permission.
+     *
+     * @example
+     * ```ts
+     * const { data } = await pollinations.listSites();
+     * data.forEach(site => console.log(site.url));
+     * ```
+     */
+    async listSites(options: RequestOptions = {}): Promise<SitesResponse> {
+        return this.getJson<SitesResponse>(
+            `${this.baseUrl}/account/sites`,
+            options.signal,
+        );
+    }
+
+    /**
+     * Publish a static site at `https://<name>.pollinations.app`, replacing
+     * what was there. Files are sent inline (up to 5 MB per request);
+     * `index.html` is required. The first deploy claims the name.
+     *
+     * @example
+     * ```ts
+     * const site = await pollinations.deploySite('my-app', [
+     *   { file: 'index.html', data: '<h1>Hello</h1>' },
+     *   { file: 'logo.png', data: pngBase64, encoding: 'base64' },
+     * ]);
+     * console.log(site.url); // https://my-app.pollinations.app
+     * ```
+     */
+    async deploySite(
+        name: string,
+        files: SiteFile[],
+        options: RequestOptions = {},
+    ): Promise<Site> {
+        return fetchWithTimeout(
+            `${this.baseUrl}/account/sites/${encodeURIComponent(name)}`,
+            {
+                method: "PUT",
+                headers: this.getHeaders("application/json"),
+                body: JSON.stringify({ files }),
+            },
+            this.textTimeout,
+            options.signal,
+            async (response) => {
+                if (!response.ok) await this.handleErrorResponse(response);
+                return response.json() as Promise<Site>;
+            },
+        );
+    }
+
+    /**
+     * Take a site offline and free its name.
+     *
+     * @example
+     * ```ts
+     * await pollinations.deleteSite('my-app');
+     * ```
+     */
+    async deleteSite(
+        name: string,
+        options: RequestOptions = {},
+    ): Promise<void> {
+        return fetchWithTimeout(
+            `${this.baseUrl}/account/sites/${encodeURIComponent(name)}`,
+            { method: "DELETE", headers: this.getHeaders() },
+            this.textTimeout,
+            options.signal,
+            async (response) => {
+                if (!response.ok) await this.handleErrorResponse(response);
             },
         );
     }

@@ -29,6 +29,7 @@ import {
     callOpenRouterGeminiImageAPI,
     callOpenRouterGrokImagineImage2API,
     callOpenRouterGrokImagineProAPI,
+    callOpenRouterQwenImage3API,
     callOpenRouterRecraftFlashAPI,
     callOpenRouterRecraftVectorAPI,
     callOpenRouterSeedreamFlashAPI,
@@ -912,6 +913,13 @@ const generateImage = async (
         case "black-forest-labs/flux-3-image":
             return await callOpenRouterFlux3API(prompt, safeParams);
 
+        case "black-forest-labs/flux-3-image-klein":
+            return await callFalQwenImageAPI(
+                prompt,
+                safeParams,
+                "black-forest-labs/flux-3-image-klein",
+            );
+
         case "microsoft/mai-image-2.6-flash":
         case "microsoft/mai-image-2.6": {
             try {
@@ -1031,12 +1039,8 @@ const generateImage = async (
                 "qwen-image-2.1-turbo",
             );
 
-        case "qwen/qwen-image-3:fal":
-            return await callFalQwenImageAPI(
-                prompt,
-                safeParams,
-                "qwen/qwen-image-3:fal",
-            );
+        case "qwen/qwen-image-3:openrouter":
+            return await callOpenRouterQwenImage3API(prompt, safeParams);
 
         case "black-forest-labs/flux.1-kontext-pro:replicate":
         case "black-forest-labs/flux.2-pro:replicate":

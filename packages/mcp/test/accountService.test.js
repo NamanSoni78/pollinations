@@ -18,9 +18,15 @@ const REQUESTS = [
     ],
     [
         "getUsage",
-        { daily: true, days: 14, limit: 5, model: ["openai"] },
+        {
+            daily: true,
+            days: 14,
+            limit: 5,
+            model: ["openai"],
+            key: ["k1", "k2"],
+        },
         "GET",
-        "/account/usage/daily?days=14",
+        "/account/usage/daily?days=14&api_key_ids=k1%2Ck2",
     ],
     ["getEarnings", { days: 30 }, "GET", "/account/earnings?days=30"],
     ["listQuests", {}, "GET", "/account/quests"],
@@ -52,6 +58,18 @@ const REQUESTS = [
     ],
     ["createKey", { name: "bot" }, "POST", "/account/keys", { name: "bot" }],
     ["revokeKey", { id: "abc123" }, "DELETE", "/account/keys/abc123"],
+    ["listSites", {}, "GET", "/account/sites"],
+    [
+        "deploySite",
+        {
+            name: "my-app",
+            files: [{ file: "index.html", data: "<h1>Hi</h1>" }],
+        },
+        "PUT",
+        "/account/sites/my-app",
+        { files: [{ file: "index.html", data: "<h1>Hi</h1>" }] },
+    ],
+    ["deleteSite", { name: "my-app" }, "DELETE", "/account/sites/my-app"],
 ];
 
 function mockFetch(t, respond) {

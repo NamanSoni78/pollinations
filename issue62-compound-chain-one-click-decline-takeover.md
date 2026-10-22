@@ -1,5 +1,7 @@
 # One-click full account takeover with the victim's consent bypassed entirely: chaining the `/authorize` `javascript:` redirect (issue 40) with API-level permission minting (issue 59) and `/api/device/approve`'s client-supplied `apiKey` (issue 53) — the single click can be "Decline"
 
+> **STATUS UPDATE 2026-10-22:** upstream `5e07b12a` ("fix(enter): check the authorize redirect scheme before redirecting") fixes the issue-40 link of this chain and is deployed to production (verified in live bundle `authorize-D6Gs4z3h.js`: `BROWSER_SCHEMES` blocklist). The `javascript:` execution vector is closed — reviewed, no bypass found. **The remaining links are still live and independently exploitable**: issue 59 (API accepts `accountPermissions` on any key type), issue 53 (`/api/device/approve` stores the client-supplied `apiKey` verbatim — no XSS required, any script/key holder with a victim session can invoke it), and issue 61 (the same one-click takeover outcome via the consent screen's pre-checked `keys` scope, no redirect involved). The compound-chain risk documented here stands: fixing the XSS alone does not neutralize the takeover chain.
+
 ## Summary
 
 Each link in this chain is already filed; this issue documents the **compound exploitation** and the one property that makes it worse than any single link: **the victim's only interaction is a click on "Decline"**. The consent screen is never honored — the user actively refuses and is still compromised.

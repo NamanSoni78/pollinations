@@ -172,3 +172,62 @@ Two consequences specific to the newly-confirmed routes:
 2. **Media-file routes keep provider metadata headers on HIT.** `mediaCacheAdapter.get` serves the stored R2 object with `CACHED_HEADERS` (song-id, generation-id, x-model-used, x-usage-*), so a keyless replay of an audio HIT even leaks which upstream model produced it and its usage.
 
 The fix section above applies unchanged to every row of this table: partition by caller identity (or drop the shared cache for paid models), and place the lookup after auth for anything that can return permission-gated content.
+
+## Scope addendum 2 — transcription + simple-audio mounts were missing from the map; `with-timestamps` uses the wrong cache (2026-10-23, wave-26 verification)
+
+Re-walking the two audio route families that return **JSON, not media files** found three rows the addendum table above did not carry, plus one correction. The pattern is unchanged — every mount below serves HITs from the shared identity-blind key before `generationAccess` — but the transcription family has victim classes the text routes do not.
+
+### 1. `POST /v1/audio/transcriptions` — textCache, MISSING from the map
+
+```ts
+// gen.pollinations.ai/src/routes/audio.ts:4714-4835 (order as mounted)
+.post("/transcriptions",
+    resolveModel("generate.audio", { defaultModel: "openai/whisper-large-v3", … }),  // :4824
+    track("generate.audio"),                                                        // :4828
+    prepareGenerationRequest,                                                       // :4829
+    textCache,                                   // ← lookup HERE (:4830)
+    generationAccess,                             // ← auth/balance only HERE (:4831)
+    deduplicateGeneration,
+    apiKeyBudgetReservation,
+    handleTranscription,
+)
+```
+
+This route returns the **transcript of an audio file** as JSON. `openai/whisper-large-v3` is `paidOnly: false` at $0.163/hour (`shared/registry/audio.ts:662-679`), so any signup key — including a Quest-pollen-only balance — can seed entries. Consequences the text-cache rows do not have:
+
+- **Confidential transcripts served to anyone holding the file bytes.** Speech-to-text output routinely contains private content (voice memos, meetings, medical/legal dictation). Once any user transcribes file `F` with params `P`, the transcript sits in the shared TEXT bucket retrievable **without any key or account** by anyone who later obtains the same audio bytes (a leaked recording archive, a shared drive, a breach). In a leak scenario where an attacker can read raw audio but has no Pollinations account, every previously-transcribed file's content is already extracted and keyless.
+- **Multipart identity is boundary-independent — cross-client, not just cross-user.** `prepareGenerationRequest` normalizes the multipart body (`middleware/generation-cache.ts:81-110`): the cache identity is `stableStringify({ field: { file name, file type, sha256(bytes) }, … })` with only the `key` field stripped. The random multipart boundary each client generates is **not** part of the key, so a curl-seeded entry is served to a Python/browser victim and vice versa — no client fingerprint needs to match.
+- **Ground-truth poisoning with a low seed cost.** Pipelines ingest transcripts as authoritative text (subtitles, meeting minutes, evidence workflows). An attacker seeds entries for audio that third parties commonly transcribe (public clips + default params) for fractions of a cent of Quest pollen; every later identical request receives the cached entry presented as fresh model output. The `prompt` form field does participate in the key, so a victim passing their own `prompt` is not served a `prompt`-differing seed — but default-parameter victims are.
+- The victim side is `notBilled` and rate-limit-free exactly as in Attack A/C.
+
+### 2. `POST /v1/audio/speech/with-timestamps` — textCache, not audioCache (correction)
+
+The addendum table listed this route under `audioCache` at `audio.ts:4583`. It is a separate mount at `:4701-4711` using **`textCache`** (`:4707`) before `generationAccess` (`:4708`). It cannot use the media adapter (`audioCache.shouldCache` accepts only `audio/` / `application/zip`, `middleware/media-cache.ts:62-67`) because its response is JSON — base64 audio plus character alignments — so the entire payload lands in the shared TEXT bucket, pre-auth, like any chat response. Two additions:
+
+- The response embeds synthesized audio as base64 inside JSON, so each cache entry costs ≈ 1.33× the audio size in R2 TEXT storage, and `createCaptureStream` has **no per-entry size cap** (`utils/text-cache.ts:296-369` — `totalSize` is only logged). With `input` up to 10,000 characters, a single entry reaches megabytes, and unique inputs seed unbounded unique entries — a storage-amplification surface on top of the replay issue.
+- The alignment JSON is deterministic per (input, voice, format, seed) — the same identity-blind replay and pre-seed poisoning as chat bodies applies to it directly.
+
+### 3. `GET /audio/:text` — audioCache, MISSING from the map
+
+```ts
+// gen.pollinations.ai/src/routes/proxy.ts:1165-1216
+.get("/audio/:text",
+    …
+    track("generate.audio"),                                                        // :1210
+    audioCache,                                   // ← lookup HERE (:1211)
+    generationAccess,                             // ← auth/balance only HERE (:1212)
+    …
+)
+```
+
+The simple GET audio endpoint (speech/music, prompt in the path) serves cached paid audio files keylessly before auth — same row semantics as the POST audio file routes already in the table, listed here so the map is complete.
+
+### Corrected complete map
+
+| Route | Cache middleware | Mount (cache before auth) |
+|---|---|---|
+| `POST /v1/audio/transcriptions` | `textCache` (shared TEXT bucket) | `routes/audio.ts:4830` (auth `:4831`) — **new row** |
+| `POST /v1/audio/speech/with-timestamps` | `textCache` (shared TEXT bucket) | `routes/audio.ts:4707` (auth `:4708`) — **corrected from `audioCache`** |
+| `GET /audio/:text` | `audioCache` (media/R2) | `routes/proxy.ts:1211` (auth `:1212`) — **new row** |
+
+All rows above join the fix unchanged: identity-partitioned keys (or no shared cache for paid/permission-gated models), lookup after auth, bounded entry size for the TEXT bucket.

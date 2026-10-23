@@ -18,7 +18,7 @@ Decisive detail: the `X-Cache-Key` header of the keyed (step 2) and keyless (ste
 
 ## Summary
 
-Every text-generation route (`/v1/chat/completions`, `/v1/responses`, `/alpha/decisions`, plus the audio routes) mounts a cache middleware **whose lookup happens before authentication, balance, and permission checks, and whose key contains no identity whatsoever**. The middleware's own doc comment states the design plainly:
+Every text-generation route (`/v1/chat/completions`, `/v1/responses`, `/alpha/decisions`, plus the audio routes) mounts a cache middleware **whose lookup happens before authentication, balance, and permission checks, and whose key contains no identity whatsoever** — and the media routes share the same mounting order (`routes/proxy.ts:198-206`: `track → imageCache → generationAccess → …` for image/video, and `model3dCache` likewise at :208-217), so the pattern covers paid image/video/3D generations too. The middleware's own doc comment states the design plainly:
 
 ```ts
 // gen.pollinations.ai/src/middleware/text-cache.ts:1-13

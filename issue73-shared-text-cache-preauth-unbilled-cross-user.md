@@ -146,3 +146,29 @@ If an attacker can learn or predict a victim's exact request (shared templates, 
 | HIT returns before any auth runs | `middleware/generation-cache.ts:233-234` |
 | TTL refreshed on every read (immortal popular entries) | `utils/text-cache.ts:240-296` (`refreshR2ObjectTtl`) |
 | `no-cache` never honored (bare bucket get) | `utils/text-cache.ts:240-247` |
+
+## Scope addendum — the complete pre-auth cache mount map (2026-10-23, wave-25 verification)
+
+The original report named the chat-style text routes. Re-walking every route that mounts a generation cache confirms the pattern is total — every cacheable generation surface on gen.pollinations.ai serves HITs before auth/balance/permission checks, with the same identity-blind key. Full map:
+
+| Route | Cache middleware | Mount order (cache before auth) | What a keyless HIT leaks |
+|---|---|---|---|
+| `POST /v1/chat/completions` | `textCache` | `routes/proxy.ts:227` | paid text output (Attack A) |
+| `POST /v1/responses` | `textCache` | `routes/proxy.ts:241` | same, responses protocol |
+| `POST /alpha/decisions` | `textCache` | `routes/proxy.ts:266` | agent-decision output |
+| `POST /v1/embeddings` | `textCache` | `routes/proxy.ts:887` | **paid embedding vectors** — per-token-billed embedding output (openai/cohere/gemini embedding models are paid), replayed keyless and unbilled |
+| `POST /text` and `GET /text/:prompt` | `textCache` | `routes/proxy.ts:916, 958` | classic endpoint (shared cache here is documented product behavior; paid-model calls through it are still billed once globally) |
+| `POST /v1/audio/speech` (+ `/speech/with-timestamps`) | `audioCache` (media/R2) | `routes/audio.ts:4583` | paid synthesized audio files |
+| `POST /v1/audio/voice-changer` | `audioCache` | `routes/audio.ts:4369` | paid voice-changer output |
+| `POST /v1/audio/voice-isolator` | `audioCache` | `routes/audio.ts:4425` | paid isolated-stem audio |
+| `POST /alpha/audio/stem-separation` | `audioCache` | `routes/stem-separation.ts:83` | paid stem files (zip) |
+| chat/responses calls that select an image/audio/3D model | `imageCache`/`audioCache`/`model3dCache` | `src/media/responses.ts:146` (`cache` before `generationAccess`) | the chat-protocol bridge for media models is ALSO pre-auth: `POST /v1/chat/completions` with an image/audio/3D model mounts the media cache before auth |
+| native image/video routes | `imageCache` | `routes/proxy.ts:200` | (already in scope note: paid image/video files) |
+| native 3D routes | `model3dCache` | `routes/proxy.ts:211, 1160` | paid 3D assets |
+
+Two consequences specific to the newly-confirmed routes:
+
+1. **Embeddings (`POST /v1/embeddings`) are the strongest poisoning target.** Embedding responses are pure vectors — deterministic, high-value, and consumed by RAG/retrieval systems that store them long-term. An attacker who seeds the cache for a body their victim's ingestion pipeline will later submit (shared corpus chunks, popular document excerpts, template text) silently corrupts the victim's vector store: retrieval quality degrades or attacker-influenced results surface, with `X-Cache: HIT` on the victim's response as the only (ignored) signal. The victim is also `notBilled` — no billing anomaly to detect.
+2. **Media-file routes keep provider metadata headers on HIT.** `mediaCacheAdapter.get` serves the stored R2 object with `CACHED_HEADERS` (song-id, generation-id, x-model-used, x-usage-*), so a keyless replay of an audio HIT even leaks which upstream model produced it and its usage.
+
+The fix section above applies unchanged to every row of this table: partition by caller identity (or drop the shared cache for paid models), and place the lookup after auth for anything that can return permission-gated content.

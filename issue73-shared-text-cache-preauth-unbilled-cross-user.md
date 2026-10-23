@@ -1,7 +1,20 @@
 # issue 73 — The text-generation cache is identity-blind, runs **before auth/balance**, and is never billed: unauthenticated cross-user replay of paid-model outputs, cross-tenant response poisoning, and rate-limit-free reads
 
 **Severity: high (paid-only model content served with no key, no account, no rate limit, no billing; attacker can pre-seed cache entries that later victims receive as "fresh model output"; violates the repo's own stated isolation principle for agent runs)**
-**Status: LIVE in production (code-verified at upstream `a9c570bc`, 2026-10-23); class = billing integrity + cross-tenant data integrity**
+**Status: LIVE in production, verified 2026-10-23 (keyless 200 `X-Cache: HIT` replay of a key-warmed generation; identical cache-key across keyed and keyless requests; control shows auth runs on MISS — see "Live verification")**
+
+## Live verification (2026-10-23, attacker role only, own key + keyless requests)
+
+Probe: `POST https://text.pollinations.ai/v1/chat/completions`, body `{"model":"openai","messages":[{"role":"user","content":"<unique marker> reply with the single word: ok"}]}`.
+
+| Step | Auth | Result |
+|---|---|---|
+| 1. Warm | `Authorization: Bearer sk_…` | `200`, generation created (response id `pllns_7ff181…`) |
+| 2. Warm retry | `Authorization: Bearer sk_…` | `200`, **`X-Cache: HIT`**, same response id |
+| 3. **Byte-identical replay** | **none — no key, no account** | **`200`, `X-Cache: HIT`, same response id, same body — the cached generation served pre-auth** |
+| 4. Control (never-seen body) | none | `402 FREE_LIMIT` ("Free limit reached: 1 reply every 30 seconds per IP") — auth/rate limiting **does** run on MISS |
+
+Decisive detail: the `X-Cache-Key` header of the keyed (step 2) and keyless (step 3) requests is **identical** (`ea4d378e5f6d60e2890b69aa532d7221…`) — proving the API key/identity is not part of the cache key and that one R2 entry serves both. Step 4 also proves the HIT path skipped the free-tier IP rate limit, not just billing: the same IP that got a 402 for a fresh body received unlimited 200 HITs for the cached one. Reproduction script: `scripts/poc-issue73-preauth-cache.mjs` in the report bundle.
 
 ## Summary
 

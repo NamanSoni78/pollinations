@@ -231,3 +231,25 @@ The simple GET audio endpoint (speech/music, prompt in the path) serves cached p
 | `GET /audio/:text` | `audioCache` (media/R2) | `routes/proxy.ts:1211` (auth `:1212`) — **new row** |
 
 All rows above join the fix unchanged: identity-partitioned keys (or no shared cache for paid/permission-gated models), lookup after auth, bounded entry size for the TEXT bucket.
+
+## Addendum 3 — independent third-party corroboration (2026-10-24)
+
+A second security agent (reporter's own AI agent, report shared by the bounty reporter on 2026-10-24) independently produced a 9-finding report against production `gen.pollinations.ai`, of which **8 of 9 findings (their VURN-1/2/3/5/6/7/8/9) are the same root cause as this issue 73** — the identity-blind shared cache mounted ahead of auth/balance checks. We cross-verified every claim against our own code audit and live tests. Summary of the cross-check:
+
+| Their ID | Surface | Cross-check result |
+|---|---|---|
+| VURN-1 | `GET /text/:prompt` keyless HIT | **Confirmed, duplicate of issue 73 core.** Re-verified live 2026-10-24: keyed request → `x-cache: MISS`; immediate keyless replay of the same URL → `x-cache: HIT` with identical body (md5 `7d9812c2a3b7ab75daf40549fca84d91`, same `x-cache-date`), no pollen debited on the HIT. |
+| VURN-2 | `/image`, `/v1/images/*` media cache | **Confirmed, duplicate** — already covered by our scope addendum (image/video/3D share the same pre-auth mounting). |
+| VURN-3 | `POST /v1/chat/completions` | **Confirmed, duplicate** — core scope of this issue; the platform's own route docs disclose: "Identical requests may be answered from a shared cache, also for callers without an API key." |
+| VURN-5 | `POST /v1/embeddings` | **Confirmed, duplicate** — covered by addendum 1 (embeddings mount map). |
+| VURN-6 | `/v1/audio/*` | **Confirmed, duplicate** — covered by addenda 1-2 (audio file routes, transcriptions, `with-timestamps`, `GET /audio/:text`). |
+| VURN-7 | "safety-feature cache key collision" | **Claim itself is incorrect** (see below), but the underlying shared-cache behavior is this issue. |
+| VURN-8 | image "cache poisoning" | **Confirmed, duplicate** — the cross-tenant poisoning impact already documented here. |
+| VURN-9 | rate-limit evasion via cache | **Confirmed, duplicate** — the "no rate limit on HITs" impact already documented here. |
+
+Two of their specific sub-claims did **not** verify and should not be folded into a fix for this issue:
+
+1. **`/v1/models` is NOT part of this cache family** (their VURN-4, "cached model listing leaks restricted models"). Live check 2026-10-24: `GET /v1/models` responses carry no `X-Cache`/`Age` header and no text-cache middleware is mounted on the models routes — the source explicitly states `src/middleware/text-cache.ts:29` "Non-cacheable routes like /v1/models should NOT use this middleware", and grep of `src/routes/proxy.ts` confirms no `textCache` in the models handler chain. The anonymous model list is the intended public catalog (409 entries incl. `paid_only` metadata, which is pricing-page-style disclosure, not an access grant — anonymous calls to paid models still fail auth/balance). Critically, the owner-only private community model visible on an authenticated listing (`community/07mrbeastofficial/asdf` on our test key's account) is **absent from the anonymous list** — no cross-user model-catalog leak exists on this route.
+2. **Safety features ARE part of the cache key** (their VURN-7 "collision across safety features"). `generateCacheKey()` in `src/utils/text-cache.ts` includes the `x-safe` header, the `safe` query/body param, a `required-safety:<features>` part and a `SAFETY_CACHE_VERSION` salt; their PoC for this sub-claim compared two byte-identical requests (`?safety=on` twice), which demonstrates nothing.
+
+Note on their report's code evidence: the quoted snippets do not match the actual codebase (their `generateCacheKey(request, safeHeader, requiredSafetyFeatures)` signature and `createTextCache()` / `src/routes/openai.ts` artifacts do not exist — the real signature is `generateCacheKey(request, bodyText?, partition?, requiredSafetyFeatures?)` and the middleware is `createGenerationCache(textCacheAdapter)`). The behavioral conclusion still reproduces exactly as this issue documents. Full disposition table: `verification-other-agent-report-vurn1-9.md`.

@@ -50,3 +50,15 @@ Worker source read in full (`apps/websim/worker.js`, 414 lines). No phishing pag
 
 - **issue 76** supplies the domain-topology root cause and the cookie-tossing consequence analysis.
 - **issue 33** (chat XSS) and **issue 77** (agent-published HTML) are the same end-state reached through app bugs; websim reaches it through designed behavior — which is why it is filed separately rather than folded into 76.
+
+## Correction addendum (2026-10-24, live re-verification) — victim-facing reach of the worker-served path is gated by the Bearer check
+
+Re-reading `generateHtml` end-to-end and live-testing production sharpens this issue's victim-facing claims:
+
+- `GET /<path>` path-prompt generation requires an `Authorization: Bearer <key>` **header** (`worker.js` `bearerToken(request.headers.get("Authorization"))` → `authRequiredResponse()`). A plain browser navigation — the "victim navigates (link in chat/QR/email)" step in the original Attack section — sends no such header.
+- Live 2026-10-24: `GET https://websim.pollinations.ai/attacker-chosen-phish-page/` with no Bearer → **401** static "Authorization required" page (HTML-escaped, inert). With an invalid Bearer → 401 "Upstream error" (escaped). The victim cannot render attacker-generated HTML by clicking a link.
+- `POST /api/generate` is CORS-open (`Access-Control-Allow-Origin: *`, `Authorization` allowed), so an attacker page can generate with the **attacker's own** key and read the HTML — but cannot render that response as a document on `websim.pollinations.ai` (a blob created in the attacker's page inherits the attacker's origin, not websim's), and `Cache-Control: no-store` plus POST semantics defeat shared caches.
+
+**What remains live of this issue:** an authenticated caller (any signup key) can have attacker-chosen, model-written script served as first-party `text/html` on `websim.pollinations.ai` for their own session — i.e. the origin is a script host for anyone with a key, with no CSP, and the phishing/cookie-tossing end-state is real **for whoever can be made to render it**. The victim-reachable rendering path is not this worker route; it is the app's own client-side "Open" button, which executes generated HTML with the full origin via blob-URL inheritance — now filed separately as **issue 80**. The platform-relocation recommendation stands unchanged.
+
+Severity impact of this correction: the standalone victim-phishing claim of this file is withdrawn and moved to issue 80 (paste + Open vector); the "attacker-authenticated script hosting on the platform zone" core stands.
